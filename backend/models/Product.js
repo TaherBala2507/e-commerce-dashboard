@@ -4,6 +4,7 @@ const Schema = mongoose.Schema;
 
 const productSchema = new Schema({
   productName: String,
+  categoryId: { type: Schema.Types.ObjectId, ref: 'Category' },
   parentCategory: String,
   childCategory: String,
   description: String,

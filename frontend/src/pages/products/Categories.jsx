@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Form, Button, Card, Alert, ListGroup, Modal } from 'react-bootstrap';
+import axios from 'axios';
 
 function Categories() {
   const [categories, setCategories] = useState([]);
@@ -10,6 +11,16 @@ function Categories() {
   const [editingIndex, setEditingIndex] = useState(null);
   const [isChildCategory, setIsChildCategory] = useState(false);
   const [showModal, setShowModal] = useState(false);
+
+  useEffect(() => {
+    axios.get('/api/categories')
+      .then(response => {
+        setCategories(response.data);
+      })
+      .catch(error => {
+        console.error(error);
+      });
+  }, []);
 
   const handleChange = (e) => {
     setCategoryName(e.target.value);
@@ -55,24 +66,29 @@ function Categories() {
     };
 
     if (editingIndex !== null) {
-      const updatedCategories = [...categories];
-      updatedCategories[editingIndex] = newCategory;
-      setCategories(updatedCategories);
-      setSuccessMessage(`Category "${categoryName}" updated successfully!`);
-      setEditingIndex(null);
-    } else {
-      if (parentCategory) {
-        const updatedCategories = categories.map((cat) => {
-          if (cat.name === parentCategory) {
-            cat.children.push(newCategory);
-          }
-          return cat;
+      axios.put(`/api/categories/${editingIndex}`, newCategory)
+        .then(response => {
+          setCategories(categories.map((category, index) => {
+            if (index === editingIndex) {
+              return response.data;
+            }
+            return category;
+          }));
+          setSuccessMessage(`Category "${categoryName}" updated successfully!`);
+          setEditingIndex(null);
+        })
+        .catch(error => {
+          console.error(error);
         });
-        setCategories(updatedCategories);
-      } else {
-        setCategories([...categories, newCategory]);
-      }
-      setSuccessMessage(`Category "${categoryName}" added successfully!`);
+    } else {
+      axios.post('/api/categories', newCategory)
+        .then(response => {
+          setCategories([...categories, response.data]);
+          setSuccessMessage(`Category "${categoryName}" added successfully!`);
+        })
+        .catch(error => {
+          console.error(error);
+        });
     }
     setCategoryName('');
     setParentCategory('');
@@ -101,14 +117,28 @@ function Categories() {
   const handleDeleteCategory = (index, isChild = false) => {
     if (isChild) {
       const parentIndex = categories.findIndex((cat) => cat.children.some((child) => child.name === categories[index].name));
-      const updatedCategories = [...categories];
-      updatedCategories[parentIndex].children = updatedCategories[parentIndex].children.filter((_, i) => i !== index);
-      setCategories(updatedCategories);
-      setSuccessMessage(`Child category deleted successfully!`);
+      axios.delete(`/api/categories/${categories[parentIndex].children[index]._id}`)
+        .then(response => {
+          setCategories(categories.map((category, i) => {
+            if (i === parentIndex) {
+              category.children = category.children.filter((child, j) => j !== index);
+            }
+            return category;
+          }));
+          setSuccessMessage(`Child category deleted successfully!`);
+        })
+        .catch(error => {
+          console.error(error);
+        });
     } else {
-      const updatedCategories = categories.filter((_, i) => i !== index);
-      setCategories(updatedCategories);
-      setSuccessMessage(`Parent category deleted successfully!`);
+      axios.delete(`/api/categories/${categories[index]._id}`)
+        .then(response => {
+          setCategories(categories.filter((category, i) => i !== index));
+          setSuccessMessage(`Parent category deleted successfully!`);
+        })
+        .catch(error => {
+          console.error(error);
+        });
     }
   };
 
@@ -127,7 +157,7 @@ function Categories() {
   };
 
   return (
-    <div className="p-3">
+ <div className="p-3">
       <h1>Categories</h1>
 
       {/* Success Message */}
@@ -261,7 +291,7 @@ function Categories() {
             <Form.Group controlId="formEditCategoryName">
               <Form.Label>Category Name</Form.Label>
               <Form.Control
-                type="text"
+ type="text"
                 value={categoryName}
                 onChange={handleChange}
                 required

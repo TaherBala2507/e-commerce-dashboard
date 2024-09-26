@@ -1,6 +1,7 @@
 // controllers/ProductController.js
-const Product = require("../models/Product");
-const upload = require("../multer");
+const Product = require('../models/Product');
+const Category = require('../models/Category');
+const upload = require('../multer');
 
 class ProductController {
   async addProduct(req, res) {
@@ -21,23 +22,47 @@ class ProductController {
           ),
         }));
       }
+      const category = await Category.findById(productData.categoryId);
+      if (!category) {
+        return res.status(404).json({ message: 'Category not found' });
+      }
+      newProduct.categoryId = category._id;
       await newProduct.save();
       res.json(newProduct);
     } catch (err) {
-      res.status(500).json({ message: "Error adding product" });
+      res.status(500).json({ message: 'Error adding product' });
     }
   }
 
-  async getProducts(req, res) {
+  async deleteProduct(req, res) {
     try {
-      const products = await Product.find().select('productName price stock description');
-      res.json(products);
+      const productId = req.params.id;
+      const product = await Product.findById(productId);
+      if (product.categoryId) {
+        const category = await Category.findById(product.categoryId);
+        if (category) {
+          category.children = category.children.filter((child) => child.toString() !== product._id.toString());
+          await category.save();
+        }
+      }
+      await Product.findByIdAndDelete(productId);
+      res.json({ message: "Product deleted successfully" });
     } catch (err) {
-      res.status(500).json({ message: 'Error fetching products' });
+      res.status(500).json({ message: "Error deleting product" });
     }
   }
   async deleteAllProducts(req, res) {
     try {
+      const products = await Product.find();
+      for (const product of products) {
+        if (product.categoryId) {
+          const category = await Category.findById(product.categoryId);
+          if (category) {
+            category.children = category.children.filter((child) => child.toString() !== product._id.toString());
+            await category.save();
+          }
+        }
+      }
       await Product.deleteMany();
       res.json({ message: "All products deleted" });
     } catch (err) {
